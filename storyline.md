@@ -2,9 +2,9 @@
 
 **用一句话描述你想解决的问题，并添加要点作出解释**
 
-- **问题的一句话描述**：随着 CPS 从相对封闭的控制系统演化为高度互联的 cyber-physical infrastructure，攻击也不再局限于单一设备、协议或物理量异常，而是可能跨越控制主机、工业通信和物理过程持续传播；在这一趋势下，如何低延迟识别由恶意程序触发的 CPS 攻击，并将其定位到具体异常进程及其系统级行为证据，仍是现有检测方案的结构性不足；这些细粒度证据进一步构成后续 CPS 节点影响分析和恢复决策支持的入口，而不是仅给出 attack/no-attack 判断。
+- **问题的一句话描述**：随着 CPS 从相对封闭的控制系统演化为高度互联的 cyber-physical infrastructure，攻击也不再局限于单一设备、协议或物理量异常，而是可能跨越控制主机、工业通信和物理过程持续传播；在这一趋势下，如何低延迟定位由恶意程序触发的 CPS-relevant host behavior，并输出可疑/异常进程及其 process-level CPS-aware provenance evidence boundary，仍是现有检测方案的结构性不足。本文的直接目标是把主机侧 runtime 行为转化为后续 CPS 节点影响分析和恢复决策可消费的证据入口，而不是仅报告 attack/no-attack 或物理状态异常。
 - 解释1：攻击者可以通过恶意程序伪造传感器数据、修改控制程序或运行时参数、发送异常 command/reporting messages，或操纵 HMI/工程站与工业协议交互，从而进入 sensing/control path 并诱导错误控制决策。现有 CPS/ICS 防御一部分关注控制资产、控制逻辑、工业协议和运行环境是否异常，另一部分关注传感器读数、物理模型残差、控制不变量和 transduction attack；这些观测能够描述控制链路或物理后果，却难以及时捕捉恶意程序在控制主机 OS 层留下的 runtime 行为痕迹。
-- 解释2：许多 CPS 检测方法主要报告 attack/no-attack、物理状态异常或受影响状态集合，并依赖这些结果进行恢复；即使部分 host provenance 方法能够恢复攻击足迹，其证据也通常缺少面向 CPS 影响分析的明确边界，难以直接支持 CPS 场景下的 process-level attribution 和 recovery-oriented impact analysis。因此，后续影响分析和恢复决策仍缺少明确证据入口，恢复过程可能只修复 sensor/control path 上的表面后果，而难以面向攻击来源做出准确响应。
+- 解释2：许多 CPS 检测方法主要报告 attack/no-attack、物理状态异常或受影响状态集合，并依赖这些结果进行恢复；即使部分 host provenance 方法能够恢复攻击足迹，其证据也通常停留在通用主机入侵调查语义中，缺少与 sensor、actuator、controller、control command 或 simulation component 对齐的 CPS 语义边界。因此，本文检测阶段输出可疑/异常进程及其 evidence boundary，使后续 attribution、CPS 节点影响分析和 recovery-oriented decision support 能够从明确的系统级因果证据出发，而不是从孤立物理异常或粗粒度告警重新推断攻击来源。
 
 ##### **问题重要性**
 
@@ -28,9 +28,9 @@
 
 - **理由 2：低延迟进程定位不足会削弱攻击响应。**
   - 论据1：已有 CPS IDS 研究指出，CPS 攻击既可能快速破坏物理过程，也可能像 Stuxnet 一样长期潜伏并逐步设置攻击条件，因此检测未知攻击和降低 detection latency 是 CPS IDS 的核心挑战 [Mitchell14; Giraldo18; Hu18]。在闭环控制场景中，错误观测、异常控制命令或被篡改的运行时参数可能快速转化为 controller decision 和 actuator action；如果系统只能在 residual、physical invariant 或受影响状态明显异常后报警，响应时机可能已经晚于恶意程序从控制主机进入 sensing/control path 的关键阶段。
-  - 论据2：低延迟报警本身仍不足以支持准确响应。恢复或隔离攻击源需要知道异常是否由具体进程触发、该进程通过哪些 file、socket、device interface 或控制相关资源影响系统，以及这些行为是否与 CPS sensing/control path 有关。若告警只能指出物理状态、控制组件或异常时间窗口，响应者仍难以判断应该隔离哪个进程、保留哪些证据、以及把哪些系统实体交给后续 CPS 影响分析。
+  - 论据2：低延迟报警本身仍不足以支持准确响应。恢复或隔离攻击源需要知道异常是否由具体进程触发、该进程通过哪些 file、socket、device interface 或控制相关资源接触或作用于系统，以及这些行为是否与 CPS sensing/control path 有关。若告警只能指出物理状态、控制组件或异常时间窗口，响应者仍难以判断应该隔离哪个进程、保留哪些证据、以及把哪些系统实体交给后续 CPS 影响分析。
   - 论据3：现有 provenance 研究说明 attack reconstruction 可以为响应提供因果证据，但代表性工作通常只覆盖因果链的一侧。PLC-PROV 可以解释 sensor、actuator 或 PLC interaction 如何导致 CPS 后果；KAIROS 等 whole-system provenance 方法可以重建 process、file、socket 层面的恶意活动。然而，前者不直接定位控制主机上的恶意程序 runtime 行为，后者不直接组织这些行为与 CPS physical consequence 之间的入口边界。因此，仍需要一种 CPS-aware 的 process-level provenance evidence boundary，将主机侧攻击行为转化为后续影响分析和恢复决策可使用的证据入口 [PLCProv19; Kairos24]。
-  - 论据4：这种证据入口不足还会影响 recovery-oriented decision support。现有恢复决策通常依赖告警结果来选择恢复受影响的 sensor/control state、回滚异常操作，或重置受影响组件。Taser 和 RETRO 等入侵恢复研究进一步说明，恢复不能只关注系统是否回到某个正常状态，还需要区分 attack-dependent operations 与合法操作 [Taser05; RETRO10]。因此，若 CPS 告警不能定位触发攻击的恶意程序及其因果证据，恢复过程可能只处理 sensor/control path 上的表面后果，而缺少面向攻击来源的处置依据。
+  - 论据4：这种证据入口不足还会影响 recovery-oriented decision support。现有恢复决策通常依赖告警结果来选择恢复受影响的 sensor/control state、回滚异常操作，或重置受影响组件。Taser 和 RETRO 等入侵恢复研究进一步说明，恢复不能只关注系统是否回到某个正常状态，还需要区分 attack-dependent operations 与合法操作 [Taser05; RETRO10]。因此，若 CPS 告警不能输出与攻击相关的可疑/异常进程及其因果证据，恢复过程可能只处理 sensor/control path 上的表面后果，而缺少供后续 attribution 判断真正攻击来源的处置依据。
 
 ##### **问题重要性：实证研究（选填）**
 
@@ -55,8 +55,8 @@
 
 - **背景知识 1.1：本文关注的攻击路径与证据边界**
   - 解释：本文关注的是由控制主机、HMI、工程站、PLC 接口或 CPS 仿真/控制环境中的恶意程序触发的攻击。这类攻击通常需要通过 file、process、socket、device interface、控制软件接口或工业通信端点与 sensing/control path 发生交互，因此会在主机侧留下可观测的 syscall/provenance 行为证据。对于完全不经过主机软件路径的物理扰动或硬件故障，本文将其视为由物理冗余、故障诊断或 safety monitoring 互补处理的场景。
-  - 证据边界：本文所说的 evidence boundary 指围绕一次可疑攻击行为划定的最小可解释证据范围，包括异常时间边界、可疑进程、关键 syscall/provenance 子图、相关 file/socket/device interface/control resource，以及这些系统实体与 CPS sensing/control path 的关联。该边界不是完整的 CPS impact analysis，也不是完整 recovery plan，而是后续影响分析和恢复决策可以使用的 process-level CPS-aware provenance evidence 入口。
-  - CPS 节点映射入口：本文还需要维护或推断系统实体到 CPS 节点/组件的映射入口，例如某个 device interface 对应 sensor input，某个 socket endpoint 对应 PLC/HMI 通信，某个配置文件对应 controller runtime parameter，某个 control software interface 对应 actuator command path。该映射入口只说明 OS-level evidence 可以交给后续 CPS 节点影响分析的连接位置，不直接声称完成完整 CPS impact analysis；没有这种入口，OS-level provenance 只能说明主机侧行为异常，难以成为 CPS 节点影响分析的证据入口。
+  - 证据边界：本文所说的 evidence boundary 指围绕一次可疑攻击行为划定的最小可解释证据范围，包括异常时间边界、可疑进程、关键 syscall/provenance 子图、相关 file/socket/device interface/control resource，以及这些系统实体与 CPS sensing/control path 的关联。它的作用是把 OS-level provenance 中分散的进程行为、系统实体和控制相关资源组织成 process-level CPS-aware provenance evidence，使后续分析能够沿着这组边界继续判断攻击来源、受影响节点和恢复对象。
+  - CPS 节点映射入口：本文还需要维护或推断系统实体到 CPS 节点/组件的映射入口，例如某个 device interface 对应 sensor input，某个 socket endpoint 对应 PLC/HMI 通信，某个配置文件对应 controller runtime parameter，某个 control software interface 对应 actuator command path。该映射入口负责把 host-side evidence 连接到 CPS 语义空间，使 OS-level provenance 不只说明“主机侧行为异常”，还说明这些行为可以从哪些位置进入后续 CPS 节点影响分析。
   - 证据可信假设：本文假设审计日志或 provenance logs 由受保护的采集机制产生，攻击者可以通过恶意程序影响控制软件、文件、socket、device interface 或工业通信端点，但不能完全关闭、伪造或回滚日志采集通道本身。若攻击者已经控制日志基础设施或能够系统性篡改 provenance records，则需要结合可信执行、远程 attestation、secure logging 或独立监控通道来保证证据可信性，这属于互补防护假设，而不是本文主要解决的问题。
 
 - **背景知识 2**：系统级行为证据与 provenance graph
@@ -64,8 +64,19 @@
   - 解释 2：这类行为证据可以被组织成 syscall trace，也可以进一步抽象为 provenance graph。在 provenance graph 中，process、file、socket、device interface 等系统实体作为节点，read、write、execute、send、receive 等交互作为因果边，从而描述攻击行为如何在 cyber layer 内部传播，并如何接触与 sensing/control path 相关的系统实体或控制接口。它本身不直接完成 physical impact analysis，但可以为后续分析提供因果入口。
 
 - **背景知识 3**：CPS attack attribution 与 recovery-oriented decision support
-  - 解释 1：CPS attack attribution 不只是识别攻击类型，而是将异常与具体恶意程序、系统行为证据、受影响控制环节和可能的物理后果之间的因果链关联起来。对本文而言，attribution 关注的是“哪个进程通过哪些系统交互影响了哪些 CPS 节点或组件入口”，而不是仅给出 attack/no-attack 判断。
-  - 解释 2：CPS recovery-oriented decision support 指在攻击发生后，为系统恢复到安全、可控且不再受同一攻击源影响的状态提供证据依据。本文不直接生成完整 recovery action，而是输出可疑进程、相关系统实体、控制相关资源和 CPS 节点映射入口，帮助后续恢复过程判断攻击源是否需要隔离、哪些组件需要检查、哪些状态恢复可能只处理了表面后果。
+  - 解释 1：CPS attack attribution 不只是识别攻击类型，而是将异常、可疑/异常进程、系统行为证据、受影响控制环节和可能的物理后果之间的因果链关联起来。对本文而言，检测输出关注的是“哪个可疑进程通过哪些系统交互接触了哪些 CPS 节点或组件入口”；这些 evidence boundary 为后续 attribution 提供可检查的因果起点，使攻击来源判断能够基于具体进程和系统实体，而不是仅基于 attack/no-attack 结果。
+  - 解释 2：CPS recovery-oriented decision support 指在攻击发生后，为系统恢复到安全、可控且不再受同一攻击源影响的状态提供证据依据。本文输出的可疑/异常进程、相关系统实体、控制相关资源和 CPS 节点映射入口，可以帮助后续恢复过程判断攻击源是否需要隔离、哪些组件需要检查、哪些状态恢复可能只处理了表面后果。
+
+- **背景知识 4**：溯源分析
+  - 解释 1：溯源分析（provenance analysis）是一类用于刻画系统运行时因果关系的安全分析方法。它通常从审计日志、系统调用日志或内核事件中提取进程、文件、socket、设备接口等系统实体，并将 read、write、execute、connect、send、receive 等交互表示为实体之间的依赖边，从而构造 provenance graph。与单条日志或单个告警不同，溯源分析关注“行为由谁触发、经过哪些系统实体传播、最终作用到哪些对象”，因此能够为攻击调查和攻击路径重建提供可解释的因果证据。
+  - 解释 2：在入侵检测和攻击调查中，溯源分析的价值在于把离散、低层的系统事件组织成连续的攻击行为上下文。攻击者可能通过多个进程、文件、网络连接和系统资源逐步完成侦察、持久化、权限提升、横向移动或目标破坏；这些行为如果只以日志序列呈现，往往难以直接解释其攻击语义。provenance graph 则可以把这些事件连接成系统实体之间的依赖链，使分析者能够定位可疑进程、追踪攻击传播路径，并识别与攻击相关的关键系统资源。
+  - 解释 3：在 CPS 场景下，溯源分析还需要进一步连接主机侧行为与 cyber-physical loop。攻击者如果通过控制主机、HMI、工程站或仿真/控制软件影响 CPS，通常会在系统层留下与配置文件、工业通信端点、device interface、控制软件接口或 controller runtime parameter 相关的因果痕迹；这些痕迹可以被 provenance graph 表示为 process、file、socket 和 device 之间的依赖链。但 CPS 安全分析关心的不只是这些系统实体之间是否存在依赖，还关心这些实体是否对应 sensor、actuator、controller、control command 或 physical process。因此，在 CPS 中使用溯源分析时，需要把通用系统级因果链进一步映射到 CPS 组件和控制路径上，才能支撑攻击归因、受影响节点判断和面向恢复的决策。
+
+- **背景知识 5**：CPS 实时性需求与短攻击行为
+  - 解释 1：CPS 的核心特点是把计算、通信和控制过程连接到真实物理系统中。sensor 持续观测物理状态，controller 根据观测结果计算控制决策，actuator 将控制命令作用到 physical process。与普通 IT 系统相比，CPS 不只追求数据完整性和系统可用性，还要求控制过程保持安全、稳定、实时和可恢复。一次错误的 sensor reading、control input 或 actuator command 可能在很短时间内改变物理状态，因此 CPS 安全分析需要关注攻击是否会影响控制闭环，以及系统能否在物理后果扩大前定位攻击来源。
+  - 解释 2：CPS 的实时性需求使攻击检测不能只追求离线准确率。许多 CPS 场景中，controller 会周期性读取传感器数据并输出控制命令，攻击如果在某个控制周期内修改输入、篡改运行时参数、发送异常 command/reporting message，可能很快影响后续控制决策。检测窗口过大时，系统需要等待更多事件后才能判断异常，容易增加 detection latency；检测窗口过小时，系统虽然能更早看到局部异常，却可能缺少足够上下文来判断该异常是否属于同一攻击行为。因此，CPS 场景中的检测粒度需要同时考虑实时性和因果完整性。
+  - 解释 3：CPS 攻击还具有短促、局部和控制相关的特点。攻击者可以长期潜伏或伪装为正常程序，但真正影响 sensing/control path 的关键动作可能只发生在很短的执行片段中，例如短时间访问控制配置文件、修改 controller runtime parameter、向工业通信端点发送异常消息、写入 device interface，或对 sensor/control input 注入短暂扰动。本文实验中实现的短攻击也属于这一类：攻击行为在时间上不一定持续很久，但会在关键时刻接触控制相关资源并触发 CPS 侧影响。这样的攻击如果被放入过大的固定窗口中，异常证据容易被大量正常系统行为稀释；如果窗口过小，又可能无法保留进程、文件、socket 和控制资源之间的因果链。
+  - 解释 4：因此，在 CPS 中使用 host-side syscall/provenance 行为进行检测时，窗口选择不只是工程参数，而是安全语义的一部分。合适的窗口需要在异常证据变密集时提高对短攻击的可见性，在因果关系不足时保留足够上下文，并在检测延迟可接受的范围内输出可疑进程及其相关系统实体。这个背景说明，在 CPS 场景中，固定检测窗口很难同时满足实时性、短攻击可见性和因果完整性。
   
 
 ##### **解决问题的现有相关方法**
@@ -103,7 +114,17 @@
   - 技术原因 1：现有 CPS/ICS 控制资产防御和 sensor/control path 数值异常检测主要把攻击投影到 PLC 程序、工业协议、控制命令、sensor reading、control signal、physical state 或 control invariant 等 CPS 侧观测空间中。因此，它们能够判断控制链路、控制资产或物理状态是否异常，却难以持续捕捉恶意程序 在控制主机 OS 层产生的 process、file、socket、device interface 和 syscall/provenance 行为，也难以及时回答“哪个进程通过哪些系统交互触发了这次 CPS 异常”。
   - 技术原因 2：现有 host syscall/provenance 方法虽然能够刻画程序的 OS-level 行为，但其语义中心通常停留在通用计算系统中的 process-file-socket 交互上。因此，它们可以报告 anomalous process、time window、node 或 subgraph；即使部分方法能够恢复较紧凑的 attack-related provenance graph，其解释对象仍主要是 host-side attack footprint，而不是面向 CPS 影响分析的 evidence boundary，因而难以判断哪些系统级证据应作为后续 CPS 影响分析的入口。
   - 技术原因 3：上述两类证据分别停留在 CPS 后果侧和 OS 行为侧，缺少统一的时间、实体和因果关联机制。结果是，CPS 侧告警往往低估攻击源定位问题，host 侧告警又难以说明其 CPS 相关性；二者都难以同时满足低延迟检测、process-level attribution，以及为后续 CPS 节点影响分析和恢复决策提供细粒度证据入口的需求。
-  - 因此，问题的关键不只是增加一种新的异常检测器，而是建立一种低延迟、可用于 attribution 和后续 CPS 影响分析的 provenance evidence，使系统能够回答“谁触发了攻击”“通过什么系统行为触发”，并为后续判断“可能影响哪些 CPS 节点”提供明确的证据入口。
+  - 因此，问题的关键不只是增加一种新的异常检测器，而是建立一种低延迟、可用于 attribution 和后续 CPS 影响分析的 provenance evidence boundary，使系统能够回答“谁触发了攻击”“通过什么系统行为触发”，并为后续判断“可能影响哪些 CPS 节点”提供明确的证据入口。
+
+- **共性缺陷 2：** 现有方法缺少面向 CPS 响应的攻击归因证据。
+  - 技术原因 1：许多 CPS/ICS 控制资产防御和 sensor/control path 数值异常检测方法，本质上把检测目标定义为“系统是否异常”或“某个控制变量是否被篡改”。因此，它们常输出 attack/no-attack、异常时间窗口、异常传感器、异常控制信号或受影响状态集合。这类结果能够提示系统存在风险，但在触发告警后，不能直接回答安全分析员最需要的问题：哪个进程触发了攻击、它通过哪些 file/socket/device interface 或控制相关资源进入 sensing/control path、哪些证据应该被保留、哪些组件需要隔离或检查。由于缺少这些归因证据，恢复过程容易停留在处理异常读数、重置控制状态或恢复受影响组件上，而难以面向真正的攻击来源做处置。
+  - 技术原因 2：通用 host syscall/provenance 检测方法虽然能够分析进程、文件和 socket 等系统实体之间的因果关系，但它们的语义中心通常是通用主机入侵调查，而不是 CPS attack attribution。这类方法可以报告 anomalous process、time window、suspicious node 或 attack-related subgraph，也可能恢复一段 host-side attack footprint；但这些结果通常不说明其中的 file、socket、device interface 或控制软件资源分别对应哪个 sensor、actuator、controller、control command 或 physical process。因此，直接使用现有 host provenance graph，仍难以形成 CPS 场景下有效的溯源分析图，也难以把主机侧攻击证据转化为后续 CPS 节点影响分析和 recovery-oriented decision support 可以消费的输入。
+  - 技术原因 3：上述两类方法的共同问题是检测输出和响应需求之间存在语义断层。CPS 侧检测方法知道“哪里出现了物理或控制异常”，但不知道“哪个主机进程造成了异常”；host 侧 provenance 方法知道“主机中哪些实体存在因果关系”，但不知道“这些实体和 CPS 控制路径有什么关系”。因此，现有方法即使能够触发告警，也难以提供从 attack/no-attack 到 process-level attribution、再到 CPS 组件影响判断的连续证据链。对于需要快速隔离攻击源、保留证据并支持恢复决策的 CPS 场景，这种归因证据缺失会直接限制检测结果的可操作性。
+
+- **共性缺陷 3：** 现有方法缺少面向 CPS 短攻击行为的自适应窗口调整机制。
+  - 技术原因 1：许多检测方法默认使用固定时间窗口、固定事件数量窗口或离线完整 trace 来组织行为上下文。这种设计在普通主机入侵检测中可以简化建模，但在 CPS 场景中会把检测粒度固定在算法预设上，而不是根据控制相关行为是否出现、异常证据是否变密集、因果链是否已经足够完整来动态调整。结果是，窗口大小成为静态超参数，难以同时适配长期潜伏、短促触发和实时响应这几类 CPS 攻击阶段。
+  - 技术原因 2：CPS 恶意程序真正影响 sensing/control path 的行为可能只发生在很短的执行片段中，例如短时间修改 controller runtime parameter、访问 device interface、发送异常 control/reporting message，或对 sensor/control input 注入短暂扰动。固定大窗口会把这些少量关键 syscall/provenance events 淹没在大量正常进程行为中，降低异常证据密度并推迟告警；固定小窗口虽然能更快捕捉局部异常，却容易截断 process、file、socket、device interface 和控制相关资源之间的因果链，使系统难以判断局部异常是否属于同一次攻击。
+  - 技术原因 3：现有方法通常把实时性、检测准确率和因果完整性作为分离的工程指标处理，而不是把它们统一到窗口调整决策中。对于 CPS，检测延迟会影响物理后果扩散，因果上下文又决定告警是否能用于后续 attribution 和 recovery-oriented decision support。如果窗口不能根据异常证据强度和因果上下文动态收缩或扩展，系统就难以在攻击关键片段出现时及时定位可疑进程，也难以在证据不足时保留足够上下文。因此，缺少自适应窗口调整会直接限制现有方法对短攻击、低延迟检测和可解释证据输出的同时支持。
 
 ##### **解决共性缺陷的难点/挑战**
 
@@ -129,13 +150,25 @@
 - 1-3 条 insights，最好是 1 条，不要超过 3 条
 - 避免算法/代码等技术细节
 
-**Insight 1**：CPS 恶意程序的关键攻击行为可能在时间上短暂稀疏，但在因果上通常会集中表现为少数控制相关的 OS-level provenance evidence；因此，检测粒度应围绕 evidence density 与 causality preservation 自适应变化，而不是固定观察整段执行。
+**Insight 1**：CPS 恶意程序可以长期潜伏或伪装，但真正触发 sensing/control path 影响的行为往往发生在短促的关键执行片段中；因此，检测窗口应根据异常证据密度和因果上下文动态收缩或扩展，而不是用固定窗口观察整段执行。
 
-- 该 insight 能解决现有方法的共性缺陷并克服相关困难的原因：固定窗口在 CPS 场景中存在天然矛盾。窗口过大时，短攻击行为会被大量正常 syscall/provenance events 稀释，导致异常证据密度下降或定位粒度变粗；窗口过小时，又会丢失 process、file、socket、device interface 之间的因果上下文，难以判断局部异常是否属于同一恶意程序行为。围绕 evidence density 调整观察粒度，可以及时暴露可能进入 sensing/control path 的短攻击证据；同时保留必要的 provenance causality，可以避免把孤立事件误判为攻击，并为后续 attribution 提供更准确的证据边界。
+- 该 insight 能解决现有方法的共性缺陷并克服相关困难的原因：固定窗口难以同时满足短攻击识别和因果链保留。窗口过大时，短促的控制影响触发行为会被大量正常 syscall/provenance events 稀释，导致异常证据密度下降、攻击时刻被平滑、进程定位变粗；窗口过小时，系统虽然更容易捕捉局部异常，却可能截断 process、file、socket、device interface 和 control resource 之间的因果关系。本文的关键观察是：攻击者可以把潜伏、侦察和伪装行为拉长，但一旦要伪造 sensor reading、修改 control input、篡改 runtime parameter 或操纵 HMI/PLC message，就必须在某个执行片段中接触控制相关资源或通信端点。围绕这些片段动态调整窗口，可以在异常证据变密集时提高短攻击可见性，在因果关系不足时扩展上下文，从而为低延迟检测、进程定位和后续 evidence boundary 构建提供合适的时间与因果范围。
 
 **Insight 2**：对 CPS recovery-oriented analysis 有用的不是完整 host provenance graph，也不是单个异常告警，而是围绕控制相关资源切出的最小、可解释、process-level CPS-aware evidence boundary。
 
-- 该 insight 能解决现有方法的共性缺陷并克服相关困难的原因：通用 host provenance 方法可以恢复 host-side attack footprint，但完整 provenance graph 往往包含大量与 CPS 控制路径无关的系统交互，难以直接用于 CPS 响应；相反，attack/no-attack、单个 anomalous node 或粗粒度 time window 又过于简化，无法说明异常进程通过哪些系统实体接触了 sensing/control path。本文所需的 evidence boundary 至少包括异常时间边界、异常进程节点、关键 syscall/provenance 子图、相关 file/socket/device/control resource，以及这些资源与 sensor、actuator、controller node 或 simulation component 的映射入口。这样的边界既比完整 provenance graph 更紧凑，又比单点告警更可解释；它不直接声称完成完整 CPS impact analysis 或 recovery action，而是为后续判断哪些 CPS 节点可能受到影响、以及如何制定恢复决策提供证据入口。
+- 该 insight 能解决现有方法的共性缺陷并克服相关困难的原因：通用 host provenance 方法可以恢复 host-side attack footprint，但完整 provenance graph 往往包含大量与 CPS 控制路径无关的系统交互，难以直接用于 CPS 响应；即使 KAIROS 等系统能够生成紧凑 host-side attack footprint，其语义中心仍是通用主机入侵调查，而不是 CPS 控制相关资源和节点映射入口。相反，attack/no-attack、单个 anomalous node 或粗粒度 time window 又过于简化，无法说明异常进程通过哪些系统实体接触了 sensing/control path。本文所需的 evidence boundary 以控制相关资源为锚点，对 host-side provenance 进行 CPS-aware 的因果裁剪：保留异常时间边界、异常进程节点、关键 syscall/provenance 子图、相关 file/socket/device/control resource，以及这些资源与 sensor、actuator、controller node 或 simulation component 的映射入口。这样的边界既比完整 provenance graph 更紧凑，又比单点告警更可解释，能够把主机侧攻击行为转化为后续 CPS 影响分析和恢复决策可直接消费的证据输入。
+
+**Insight 3 版本 A：我最推荐的版本**：provenance analysis 产生的 anomaly score 不应只被视为静态告警结果，而应被视为刻画当前窗口内攻击相关行为风险的连续信号；该信号可以为检测窗口的收缩、扩展和保持提供依据，使窗口调整从固定超参数选择转化为由行为风险驱动的动态决策。
+
+- 该 insight 能解决现有方法的共性缺陷并克服相关困难的原因：固定窗口方法通常把窗口大小作为预设参数，而不是根据当前行为风险变化进行调整；单个 attack/no-attack 告警又只能给出离散判断，难以说明系统应该继续扩大上下文、缩小聚焦短攻击片段，还是保持当前粒度。provenance analysis 在当前窗口内聚合 process、file、socket、device interface 和 control resource 之间的异常交互后，可以形成 anomaly score。该分数虽然不能等同于精确攻击概率或完整物理风险，但能够反映当前窗口内攻击相关证据的强弱变化：当分数升高且异常证据集中时，系统有理由收缩窗口以提高短攻击可见性；当分数不稳定或因果证据不足时，系统有理由扩展窗口以保留上下文；当分数稳定且证据边界清晰时，系统可以输出可疑进程及其 evidence boundary。因此，anomaly score 为自适应窗口控制提供了可解释的风险依据。
+
+**Insight 3 版本 B：对齐 anomaly score + latency overhead 的版本**：检测窗口调整不应只依赖固定窗口大小或单一实时性目标，而应同时考虑 provenance-derived anomaly score 和 latency overhead；前者刻画当前窗口内攻击相关行为风险，后者刻画继续观察或扩大窗口带来的响应代价，二者共同为窗口收缩、扩展或保持提供依据。
+
+- 该 insight 能解决现有方法的共性缺陷并克服相关困难的原因：CPS 场景中的窗口选择本质上是在短攻击可见性、因果完整性和检测延迟之间做权衡。若只追求低 latency，系统可能过早在小窗口内做出判断，导致 process、file、socket、device interface 和 control resource 之间的因果链被截断；若只追求完整上下文，系统又可能等待过多事件，使短促的控制相关攻击行为被正常行为稀释并推迟告警。provenance-derived anomaly score 可以反映当前窗口内异常证据的强弱和集中程度，而 latency overhead 可以反映扩大或保持窗口对实时响应的代价。将二者结合后，系统可以在异常分数升高且延迟代价可接受时扩展窗口以补足因果上下文，在异常分数集中且继续等待代价过高时收缩窗口以快速定位可疑进程，并在风险和代价都相对稳定时保持当前窗口。因此，窗口调整不再是静态参数选择，而是由行为风险与实时性代价共同驱动的动态决策。
+
+**Insight 4**：自适应时间窗口不应被设计成某个具体 provenance 检测系统内部的固定步骤，而应作为可插拔的窗口控制层，与 terminal identification、hopset construction 等底层证据构造机制解耦；它通过消费 anomaly score、因果上下文状态和 latency overhead，为不同检测机制提供合适的时间与因果观察范围。
+
+- 该 insight 能解决现有方法的共性缺陷并克服相关困难的原因：许多 provenance-based detection 系统把检测窗口、可疑节点识别、因果子图构造和告警生成耦合在同一个固定流程中，导致窗口大小往往被具体算法的内部假设决定，而不是由 CPS 场景中的短攻击可见性、因果完整性和检测延迟共同驱动。本文关注的时间窗口设计并不要求重新定义每一种 provenance 检测机制，也不要求替换已有系统中的 terminal identification、hopset construction 或 attack graph extraction 逻辑；相反，它可以作为这些机制之前或之上的自适应控制层，根据当前窗口内的 anomaly score、证据密度、因果上下文是否充足以及 latency overhead，决定应当收缩、扩展还是保持窗口。这样，窗口调整从具体检测系统的内部实现中解耦出来，成为一种可迁移的 provenance threat detection 原理：底层系统可以继续使用不同的可疑节点识别和子图构造方法，而窗口层负责为这些机制提供更合适的时间与因果观察范围。
 
 ##### **新的 Insights 的本质区别**
 
@@ -197,7 +230,7 @@
 - 架构图：系统由四个主要部分组成：日志采集与规范化模块、自适应窗口控制模块、异常检测与证据汇总模块、recovery-oriented 输出模块。整体流程是：CPS 主机或仿真环境产生 syscall/provenance logs，日志经过规范化后进入检测系统；检测系统在当前窗口内计算异常分数，并估计扩大或缩小检测窗口带来的实时性变化；自适应窗口控制模块根据异常分数和实时性代价决定是否调整窗口大小以及调整幅度；最后，系统输出当前检测窗口、异常分数、可疑进程、相关系统实体、受影响 CPS 节点/组件等详细信息。
   **体现新的 Insights 的组件**：自适应窗口控制模块和 recovery-oriented 输出模块。前者体现 Insight 1：检测窗口由异常证据强度和实时性代价共同驱动，而不是固定观察整段执行；后者体现 Insight 2：告警输出不仅报告异常，还提供能够支持 recovery 的 process-level provenance evidence 和受影响节点定位。
   **架构输入**：syscall/provenance logs、当前检测窗口内的异常分数、窗口调整对检测延迟或实时性开销的影响估计，以及 CPS 环境中 process、file、socket、device interface 与 sensor、actuator、controller node 或 simulation component 之间的映射信息。
-  **架构输出**：当前窗口是否异常、窗口调整决策、调整后的窗口大小、异常分数、可疑恶意程序、相关 file/socket/device interface、可能受影响的 CPS 节点或组件，以及用于 recovery 的定位提示。
+  **架构输出**：当前窗口是否异常、窗口调整决策、调整后的窗口大小、异常分数、可疑/异常进程、相关 file/socket/device interface、可能受影响的 CPS 节点或组件，以及用于 recovery 的定位提示。
   - 组件 1：日志采集与规范化模块
     - 功能：从 CPS 主机或仿真环境中收集 syscall/provenance logs，并将不同来源、不同顺序或可能存在轻微错乱的日志整理成检测系统可处理的事件流。该模块不直接判断攻击，而是为后续窗口调整和异常检测提供稳定输入。
   - 组件 2：自适应窗口控制模块
@@ -207,7 +240,7 @@
   - 组件 4：鲁棒日志处理模块
     - 功能：提高检测系统对日志传输错乱的鲁棒性。当日志在传输到检测系统的过程中出现轻微乱序或局部错乱时，该模块尽量恢复事件的相对因果关系或降低乱序对检测窗口和异常分数的影响，使系统仍能保持较稳定的检测结果。
   - 组件 5：Recovery-oriented 输出模块
-    - 功能：将异常检测结果转化为 CPS recovery 可使用的信息，包括可疑进程、相关系统实体、可能受影响的 sensor、actuator、controller node 或 simulation component。该模块帮助后续恢复过程执行隔离可疑进程、重置受影响节点、切换安全控制逻辑或触发局部状态恢复等动作。
+    - 功能：将异常检测结果转化为 CPS recovery 可使用的信息，包括可疑/异常进程、相关系统实体、可能受影响的 sensor、actuator、controller node 或 simulation component。该模块帮助后续恢复过程执行隔离可疑进程、重置受影响节点、切换安全控制逻辑或触发局部状态恢复等动作。
 
 ##### **设计方案：组件1**
 
